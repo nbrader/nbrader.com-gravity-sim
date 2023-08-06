@@ -84,7 +84,7 @@ init _ =
             , centreMass = 50
             , particleMass = 30
             , numParticles = initNumOfParticles
-            , showEllipses = False
+            , showEllipses = True
             }
         initialModel =
             { tempModel | particles = resettedParticles tempModel
