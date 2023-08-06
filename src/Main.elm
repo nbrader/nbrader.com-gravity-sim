@@ -11,7 +11,7 @@ import Task exposing (perform)
 import Color exposing (Color, toCssString, rgb, rgba)
 
 import Linear.Vectors.Vec2D 
-    exposing (Vec2D, add, scale, norm, subtract, normalize, distance, dot, zero)
+    exposing (Vec2D, add, scale, norm, subtract, normalize, distance, dot)
 
 import Dynamical.Numerical exposing (dormandPrince)
 
@@ -87,7 +87,7 @@ init _ =
             , showEllipses = False
             }
         initialModel =
-            { tempModel | particles = resettedParticles initNumOfParticles
+            { tempModel | particles = resettedParticles tempModel
             }
     in
     ( initialModel
@@ -101,36 +101,29 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         MouseMove x y ->
-            (model, Cmd.none)
+            ({ model | centreOfGravity = { x = toFloat x, y = toFloat y } }, Cmd.none)
         
         Tick realCurrTimeMS ->
             let
                 dt = 10
                 currTimeMS = model.lastTimeMS + dt
                 
-                computeAcceleration particleID position velocity =
+                computeAcceleration position velocity mass =
                     let
                         forceGravityRK4Particle = 
-                            List.map (\pID -> 
-                            let
-                                particle = Maybe.withDefault {position=zero, velocity=zero} (getAt model.particles pID)
-                            in
-                            forceGravity model.gravityConstant model.particleMass 
-                            position model.particleMass particle.position) (List.filter (\otherID -> otherID /= particleID) (List.range 0 (List.length model.particles - 1)))
-                            |> List.foldl add zero
+                            forceGravity model.gravityConstant model.centreMass 
+                            position mass model.centreOfGravity
                         forceDampingRK4Particle = 
-                            forceDamping model.dampingConstant model.particleMass velocity
+                            forceDamping model.dampingConstant mass velocity
                     in
-                    add (scale (1 / model.particleMass) forceGravityRK4Particle)
-                        (scale (1 / model.particleMass) forceDampingRK4Particle)
+                    add (scale (1 / mass) forceGravityRK4Particle) 
+                        (scale (1 / mass) forceDampingRK4Particle)
                 
-                updateParticle particleID =
+                updateParticle particle mass =
                     let
-                        particle = Maybe.withDefault {position=zero, velocity=zero} (getAt model.particles particleID)
-                        
                         stateVectorInit = 
                             [particle.position.x, particle.position.y, 
-                             particle.velocity.x, particle.velocity.y]
+                            particle.velocity.x, particle.velocity.y]
                         
                         derivative time stateVector = 
                             case stateVector of
@@ -141,10 +134,10 @@ update msg model =
                                         
                                         deltaPosition = vel
                                         deltaVelocity = 
-                                            computeAcceleration particleID pos vel
+                                            computeAcceleration pos vel mass
                                     in
                                     [deltaPosition.x, deltaPosition.y, 
-                                     deltaVelocity.x, deltaVelocity.y]
+                                    deltaVelocity.x, deltaVelocity.y]
                                 _ ->
                                     [0, 0, 0, 0]
                         
@@ -155,20 +148,20 @@ update msg model =
                             case newValues of
                                 [newPosX, newPosY, newVelX, newVelY] ->
                                     (vectorToVec2D [newPosX, newPosY], 
-                                     vectorToVec2D [newVelX, newVelY])
+                                    vectorToVec2D [newVelX, newVelY])
                                 _ ->
                                     (vectorToVec2D [0, 0], vectorToVec2D [0, 0])
                         (newPositionError, newVelocityError) =
                             case errors of
                                 [newPosX, newPosY, newVelX, newVelY] ->
                                     (vectorToVec2D [abs newPosX, abs newPosY], 
-                                     vectorToVec2D [abs newVelX, abs newVelY])
+                                    vectorToVec2D [abs newVelX, abs newVelY])
                                 _ ->
                                     (vectorToVec2D [0, 0], vectorToVec2D [0, 0])
                         
                         errorParticle = 
                             { position = newPositionError, 
-                              velocity = newVelocityError }
+                            velocity = newVelocityError }
                     in
                     ( { particle | position = newPosition, 
                         velocity = newVelocity }
@@ -176,7 +169,8 @@ update msg model =
                     )
                 
                 (updatedParticles, errorParticles) = 
-                    List.unzip <| List.map updateParticle (List.range 0 (List.length model.particles - 1))
+                    List.unzip <| List.map (\p -> updateParticle p 
+                        model.particleMass) model.particles
             in
             ({ model 
                 | particles = updatedParticles
@@ -226,13 +220,13 @@ update msg model =
         
         IncreaseParticleMass ->
             let
-                newParticleMass = model.particleMass + 10
+                newParticleMass = model.particleMass + 0.1
             in
             ({ model | particleMass = newParticleMass }, Cmd.none)
         
         DecreaseParticleMass ->
             let
-                newParticleMass = model.particleMass - 10
+                newParticleMass = model.particleMass - 0.1
             in
             ({ model | particleMass = newParticleMass }, Cmd.none)
         
@@ -276,27 +270,29 @@ update msg model =
 
 resettedModel : Model -> Model
 resettedModel model = 
-    { model 
-    | particles = resettedParticles model.numParticles
+    { model     
+    | particles = resettedParticles model
     , errorParticles = List.repeat model.numParticles initParticle
     }
 
-resettedParticles : Int -> List Particle
-resettedParticles numParticles =
+resettedParticles : Model -> List Particle
+resettedParticles model =
     let
-        vel = 1
+        maxRadius = 300
         resetEachParticle i = 
             let
-                frac = (i / toFloat numParticles)
-                radians = (2*pi*frac)
+                fraction = i / toFloat model.numParticles
+                positionOnLine = maxRadius * fraction
+                distance = sqrt ((model.centreOfGravity.x - 400)^2 + (model.centreOfGravity.y - (400 + positionOnLine))^2)
+                velocityMagnitude = sqrt (model.gravityConstant * model.centreMass / distance)
             in
-            { position = { x = 400 + ((50+300*frac) * cos radians)
-                         , y = 400 + ((50+300*frac) * sin radians) }
-            , velocity = { x = vel * sin radians
-                         , y = -vel * cos radians }
+            { position = { x = 400
+                         , y = 400 + positionOnLine }
+            , velocity = { x = velocityMagnitude
+                         , y = 0 }
             }
     in
-    List.map resetEachParticle (List.map toFloat (List.range 1 numParticles))
+    List.map resetEachParticle (List.map toFloat (List.range 1 model.numParticles))
 
 
 -------------------------------------------------------------------------------
@@ -571,15 +567,6 @@ viewEllipse ellipse =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Time.every 10 (\currTimePosix -> Tick (Time.posixToMillis currTimePosix))
-
-
-getAt : List a -> Int -> Maybe a
-getAt xs n = 
-  if n < 0 then Nothing
-     else case (xs,n) of
-             ([],_)    -> Nothing
-             (x::ys,0) -> Just x
-             (_::ys,m) -> getAt ys (m-1)
 
 
 -------------------------------------------------------------------------------

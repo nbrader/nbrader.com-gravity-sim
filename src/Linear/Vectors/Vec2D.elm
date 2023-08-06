@@ -1,4 +1,4 @@
-module Linear.Vectors.Vec2D exposing (Vec2D, add, scale, norm, subtract, normalize, distance, dot, decomposeVec2D, zero)
+module Linear.Vectors.Vec2D exposing (Vec2D, add, scale, norm, subtract, normalize, distance, dot, decomposeVec2D)
 
 import Basics exposing (sqrt)
 
@@ -51,5 +51,3 @@ decomposeVec2D vector dir =
         orthogonalComponent = subtract vector alignedComponent
     in
     (alignedComponent, orthogonalComponent)
-
-zero = {x=0, y=0}
