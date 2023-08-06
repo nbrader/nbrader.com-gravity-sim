@@ -389,7 +389,7 @@ view model =
                    , div [ style "margin-top" "10px" ] [ text ("The particles are gravitationally attracted to it.") ]
                    , div [ style "margin-top" "10px" ] [ text ("These particles also feel 'viscous damping' (default off).") ]
                    , div [ style "margin-top" "10px" ] [ text ("If a particle has achieved escape velocity, a square appears around it.") ]
-                   , div [ style "margin-top" "10px" ] [ text ("The local truncation error due to numerical integration of a particle relative to the others is depicted in it's size (bigger particles have more error).") ]
+                   , div [ style "margin-top" "10px" ] [ text ("The local truncation error due to numerical integration of a particle relative to the others is depicted in it's colour (redder particles have more error).") ]
                    , div [ style "margin-top" "10px" ] [ text ("Number of particles achieving escape velocity: " ++ String.fromInt escapeVelocityCount) ]
                    ]
                 ++ [ div [ style "margin-top" "10px" ]
