@@ -1,3 +1,5 @@
+REM If the uglifyjs command is not available in your terminal, you can run the command npm install uglify-js --global to download it. If you do not have npm either, you can get it with nodejs (https://nodejs.org/en).
+
 @echo off
 setlocal
 
